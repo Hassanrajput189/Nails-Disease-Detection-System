@@ -1,0 +1,42 @@
+# Python 
+__pycache__/
+
+#YOLO model directory
+YOLO_weights/
+
+#CNN models files
+*.keras
+
+#CNN models directory
+models/
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+anaconda_projects/
+
+# Dataset Files
+datasets/
+
+# IDE Settings
+.vscode/
+
+# Environment Variables
+.env
+
+# Images of classification reports of models
+reports/
+
+#Authentication test file
+auth_test.html
+
+# node modules 
+node_modules/
+
+#prototype client
+client/
