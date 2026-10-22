@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from database.schema import PredictionResponse
 import cv2
 import numpy as np
-from utils import  predict,make_scorecam_heatmap,overlay_heatmap,convert_to_base64
+from utils import  predict,make_scorecam_heatmap,overlay_heatmap,convert_to_base64,gatekeeper_inference
 import time
 import traceback
 
@@ -47,9 +47,12 @@ async def predict_grade(
         img_gray = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
 
         if img_gray is None:
-            raise ValueError(
-                "Failed to decode image — invalid or corrupted file"
-            )
+            return JSONResponse(
+                    status_code=422,
+                    content={
+                        "message":"Unprocessable Image"
+                    }
+                )
 
         decode_time = time.perf_counter() - start
 
@@ -62,6 +65,16 @@ async def predict_grade(
 
         rgb_time = time.perf_counter() - start
 
+        # Gate Keeper validation
+        is_valid_knee = gatekeeper_inference(img_rgb)[0][0] >= 0.5        
+        
+        if(not is_valid_knee):
+            return JSONResponse(
+                        status_code=422,
+                        content={
+                            "message":"Please enter a valid nail image"
+                        }
+                    )
 
         # 4. ROI extraction
 
@@ -166,8 +179,7 @@ async def predict_grade(
                 "predicted_category": predicted_category,
                 "confidence": confidence,
                 "class_probabilities": class_probs,
-                "heatmap": converted_img,
-                "processing_time": round(total_time, 4)
+                "heatmap": converted_img,                
             }
         )
 

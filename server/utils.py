@@ -11,10 +11,26 @@ from huggingface_hub import hf_hub_download
 
 HF_REPO = config("HF_REPO")
 HF_TOKEN = config("HF_TOKEN")
+gatekeeper_model_path = config("GATEKEEPER_MODEL_PATH")
+gatekeeper_model_name = config("GATEKEEPER_MODEL_NAME")
 detector_path = config("DETECTOR_PATH")
 classifier_path = config("CLASSIFIER_PATH")
+model_gatekeeper = None
 model = None
 model_YOLO = None
+
+def download_and_load_gatekeeper():
+    global model_gatekeeper
+
+    gatekeeper_path = hf_hub_download(
+        repo_id=HF_REPO,
+        filename=gatekeeper_model_path,
+        token=HF_TOKEN
+    )
+
+    model_gatekeeper = tf.keras.models.load_model(gatekeeper_path)
+
+    print("Downloaded & loaded gate keeper model to path:", gatekeeper_path)
 
 
 
@@ -44,6 +60,12 @@ def download_and_load_detector():
     print("Downloaded & loaded YOLO model to path:", YOLO_path)
 
 
+def gatekeeper_inference(image):
+    if(model_gatekeeper != None):
+        img_resized = cv2.resize(image, (224, 224))
+        img_array_prep = preprocess_input(img_resized)                          
+        y_pred = model_gatekeeper.predict(img_array_prep[np.newaxis,...])
+        return y_pred
 
 
 def predict(img):    

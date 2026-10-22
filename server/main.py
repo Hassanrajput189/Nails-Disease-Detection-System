@@ -3,16 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from predict.route import router as prediction_router
 from CRUD.user.route import router as user_router
 from CRUD.analysis.route import router as analysis_router
-
-from utils import  download_and_load_classifier,download_and_load_detector
+from utils import  download_and_load_classifier,download_and_load_detector,download_and_load_gatekeeper
 from fastapi.responses import JSONResponse
-from decouple import config
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-
-from fastapi.middleware.cors import CORSMiddleware
-CLIENT = config("CLIENT_URl")
-print("client is ",CLIENT)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,8 +18,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-download_and_load_classifier()
+download_and_load_gatekeeper()
 download_and_load_detector()
+download_and_load_classifier()
 
 app.include_router(user_router)
 app.include_router(analysis_router)
