@@ -12,7 +12,6 @@ from huggingface_hub import hf_hub_download
 HF_REPO = config("HF_REPO")
 HF_TOKEN = config("HF_TOKEN")
 gatekeeper_model_path = config("GATEKEEPER_MODEL_PATH")
-gatekeeper_model_name = config("GATEKEEPER_MODEL_NAME")
 detector_path = config("DETECTOR_PATH")
 classifier_path = config("CLASSIFIER_PATH")
 model_gatekeeper = None

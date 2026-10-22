@@ -42,9 +42,9 @@ def get_user_analyses(user_email: str):
         )
 
         if not analyses:
-            return JSONResponse(
+            raise HTTPException(
             status_code=404,
-            content={"detail": "No analysis found"}
+            detail="No analysis found"
             )
         for item in analyses:
             item.pop("_id", None)

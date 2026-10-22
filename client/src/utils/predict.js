@@ -55,7 +55,7 @@ export async function predict(file) {
 
   if (!response.ok) {
     throw new Error(
-      data.detail || 'Prediction failed. Please try another image.'
+      data?.detail || 'Prediction failed. Please try another image.'
     );
   }
 

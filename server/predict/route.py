@@ -5,8 +5,8 @@ from database.schema import PredictionResponse
 import cv2
 import numpy as np
 from utils import  predict,make_scorecam_heatmap,overlay_heatmap,convert_to_base64,gatekeeper_inference
+from fastapi import HTTPException
 import time
-import traceback
 
 router = APIRouter()
 
@@ -47,12 +47,10 @@ async def predict_grade(
         img_gray = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
 
         if img_gray is None:
-            return JSONResponse(
-                    status_code=422,
-                    content={
-                        "message":"Unprocessable Image"
-                    }
-                )
+            raise HTTPException(
+                status_code=422,
+                detail="Unprocessable Image"
+            )
 
         decode_time = time.perf_counter() - start
 
@@ -69,12 +67,10 @@ async def predict_grade(
         is_valid_knee = gatekeeper_inference(img_rgb)[0][0] >= 0.5        
         
         if(not is_valid_knee):
-            return JSONResponse(
-                        status_code=422,
-                        content={
-                            "message":"Please enter a valid nail image"
-                        }
-                    )
+            raise HTTPException(
+                status_code=422,
+                detail="Please enter a valid nail image"
+            )
 
         # 4. ROI extraction
 
@@ -183,6 +179,8 @@ async def predict_grade(
             }
         )
 
-    except Exception as e:
-        traceback.print_exc()
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+    except Exception as e:        
+        raise HTTPException(
+        status_code=500,
+        detail=str(e)
+)
