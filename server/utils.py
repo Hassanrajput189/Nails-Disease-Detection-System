@@ -1,4 +1,5 @@
 
+import os
 import base64
 import cv2
 import numpy as np
@@ -7,6 +8,8 @@ from ultralytics import YOLO
 from decouple import config
 from tensorflow.keras.applications.mobilenet_v3 import preprocess_input
 from huggingface_hub import hf_hub_download
+from fastapi import UploadFile, HTTPException
+import requests
 
 
 HF_REPO = config("HF_REPO")
@@ -14,10 +17,39 @@ HF_TOKEN = config("HF_TOKEN")
 gatekeeper_model_path = config("GATEKEEPER_MODEL_PATH")
 detector_path = config("DETECTOR_PATH")
 classifier_path = config("CLASSIFIER_PATH")
+
+
 model_gatekeeper = None
 model = None
 model_YOLO = None
 
+async def handle_cloud_upload(image: UploadFile,present,cloud_name,folder="root"):
+    CLOUD_NAME = config("CLOUD_NAME")
+    
+    form_data_cloud = {}
+    form_data_cloud["upload_preset"] = present
+    form_data_cloud["cloud_name"] = cloud_name
+    form_data_cloud["folder"] = folder
+
+    try:
+        await image.seek(0)
+        file_bytes = await image.read()
+        response_cloud = requests.post(
+            f"https://api.cloudinary.com/v1_1/{CLOUD_NAME}/image/upload",
+            data=form_data_cloud,
+            files={"file": (image.filename, file_bytes, image.content_type)},
+        )
+        response_cloud.raise_for_status()
+        return response_cloud.json()
+    except requests.RequestException as e:
+        print("URL:", e.request.url if e.request else None)
+        print("Status:", e.response.status_code if e.response is not None else None)
+        print("Body:", e.response.text if e.response is not None else None)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to upload the X-ray image to the cloud.",
+        )
+        
 def download_and_load_gatekeeper():
     global model_gatekeeper
 

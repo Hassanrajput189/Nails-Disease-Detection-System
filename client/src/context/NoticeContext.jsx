@@ -4,7 +4,7 @@ import { Modal, Button } from 'react-bootstrap';
 /*
   Global success popup (theme-coloured).
   Usage:  const { showNotice } = useNotice();
-          showNotice({ title: 'Welcome to', highlight: 'Nail Bite Detector', text: '...', button: 'Continue' });
+          showNotice({ title: 'Welcome to', highlight: 'Nail Disease Detector', text: '...', button: 'Continue' });
 */
 const NoticeContext = createContext({ showNotice: () => {} });
 export const useNotice = () => useContext(NoticeContext);

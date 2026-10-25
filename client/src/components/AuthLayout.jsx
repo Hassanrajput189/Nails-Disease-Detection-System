@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
 import Logo from './Logo.jsx';
 
-export const APP_NAME = 'Nail Bite Detector';
+export const APP_NAME = 'Nail Disease Detector';
 
-const WORDS = ['if you bite your nails.', 'your nail health.', 'nail biting early.'];
+const WORDS = ['Detect Early Signs of Nail Diseases.', 'your nail health.', 'nail disease early.'];
 const LEAD = 'Instantly know ';
 const LONGEST = WORDS.reduce((a, b) => (b.length > a.length ? b : a));
 
@@ -38,7 +38,7 @@ function HeroPicture() {
   return (
     <div className="shot glass">
       {HERO_IMAGE ? (
-        <img src={HERO_IMAGE} alt="Nail Bite Detector" />
+        <img src={HERO_IMAGE} alt="Nail Disease Detector" />
       ) : (
         <svg viewBox="0 0 460 300" preserveAspectRatio="xMidYMid slice" aria-label="Hand with nails being scanned">
           <defs>
@@ -67,8 +67,8 @@ function HeroPicture() {
         </svg>
       )}
       <div className="scanln" />
-      <div className="chip glass" style={{ left: 14, top: 16 }}>Nail biting<b>96%</b></div>
-      <div className="chip glass" style={{ right: 14, top: 70, animationDelay: '-2s' }}>Damaged cuticle<b>91%</b></div>
+      <div className="chip glass" style={{ left: 14, top: 16 }}>Healthy<b>96%</b></div>
+      <div className="chip glass" style={{ right: 14, top: 70, animationDelay: '-2s' }}>Disease<b>91%</b></div>
     </div>
   );
 }

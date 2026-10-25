@@ -12,20 +12,13 @@ router = APIRouter()
 collection_name = config("ANALYSIS_COLLECTION_NAME")
 collection = create_collection(db, collection_name)
 
-
-@router.post("/analysis")
 def create_analysis(analysis: Analysis):    
-    try:    
-        analysis_data = analysis.model_dump()
+    try:            
+        collection.insert_one(analysis)
 
-        collection.insert_one(analysis_data)
-
-        return JSONResponse(
-            status_code=201,
-            content={
-                "message": "Analysis saved successfully",            
-            }
-        )
+        return {            
+            "status":201            
+        }
     except Exception as e:
         print("Error:", e)
         raise HTTPException(
@@ -40,12 +33,7 @@ def get_user_analyses(user_email: str):
         analyses = list(
             collection.find({"userEmail": user_email}).sort("createdAt", -1)
         )
-
-        if not analyses:
-            raise HTTPException(
-            status_code=404,
-            detail="No analysis found"
-            )
+        
         for item in analyses:
             item.pop("_id", None)
 
@@ -66,19 +54,41 @@ def get_user_analyses(user_email: str):
 
     
     
+@router.delete("/delete_analysis/{public_id:path}")
+def delete_analysis(public_id: str, user_email: str):
+    try:
+        result = collection.delete_one({
+            "image.publicId": public_id,
+            "userEmail": user_email,
+        })
 
-@router.delete("/delete_analysis/{user_email}")
-def delete_user_analysis(user_email: str):
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Analysis not found for this user.")
 
-    print("userEmail is:", user_email)
+        return JSONResponse(
+            status_code=200,
+            content={"message": "Deletion successful", "id": public_id},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Error:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Internal Server Error | Please try again later",
+        )
+
+@router.delete("/delete_all_analysis/{user_email}")
+def delete_all_analysis(user_email: str):
 
     try:
         result = collection.delete_many({
             "userEmail": user_email
         })
-
+        
         print("result is:", result)
-
+        
         return JSONResponse(
             status_code=200,
             content={

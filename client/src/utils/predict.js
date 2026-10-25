@@ -38,13 +38,24 @@ export function makeThumb(src, size = 96) {
 }
 
 const API_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-export async function predict(file) {
+export async function predict(file, userEmail) {
+  if (!file) {
+    throw new Error('Please select an image first.');
+  }
+
+  if (!userEmail || !userEmail.trim()) {
+    throw new Error('Please log in first.');
+  }
+
   const formData = new FormData();
 
   // Backend expects the upload field to be named "image".
   formData.append('image', file);
+
+  // Send the logged-in user's email; no cookies required.
+  formData.append('user_email', userEmail.trim().toLowerCase());
 
   const response = await fetch(`${API_URL}/predict`, {
     method: 'POST',
@@ -75,6 +86,7 @@ export async function predict(file) {
     .sort((a, b) => b.p - a.p);
 
   return {
+    id: data.id,
     predicted_category: data.predicted_category,
     confidence: data.confidence,
     preds,

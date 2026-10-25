@@ -6,13 +6,16 @@ from CRUD.analysis.route import router as analysis_router
 from utils import  download_and_load_classifier,download_and_load_detector,download_and_load_gatekeeper
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from decouple import config
+
+CLIENT_URL = config("CLIENT_URL")
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "*",
+        CLIENT_URL
     ],
     allow_credentials=True,
     allow_methods=["*"],

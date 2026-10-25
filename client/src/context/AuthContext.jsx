@@ -27,7 +27,7 @@ export function AuthProvider({ children }) {
   const saveUser = (apiUser) => {
     const safeUser = {
       name: apiUser.name,
-      email: apiUser.email,
+      email: apiUser.email.trim().toLowerCase(),
     };
 
     const users = store.get('users', {});
@@ -71,11 +71,70 @@ export function AuthProvider({ children }) {
         };
       }
 
-      // Registration complete. The user now logs in normally (OTP is sent at login).
-      return { success: true, email };
+      if (data.message === 'otp_required') {
+        return { otpRequired: true, email };
+      }
+
+      return {
+        error: 'The server did not start signup verification. Please try again.',
+      };
     } catch {
       return {
         error: 'Cannot connect to the server. Make sure the backend is running.',
+      };
+    }
+  };
+
+  const verifySignupOtp = async (email, otp) => {
+    try {
+      const response = await fetch(`${API_URL}/signup/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          otp,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        return {
+          error: getErrorMessage(data, 'Invalid or expired verification code.'),
+        };
+      }
+
+      return { success: true };
+    } catch {
+      return {
+        error: 'Cannot connect to the server. Please try again.',
+      };
+    }
+  };
+
+  const resendSignupOtp = async (email) => {
+    try {
+      const params = new URLSearchParams({
+        email: email.trim().toLowerCase(),
+      });
+
+      const response = await fetch(
+        `${API_URL}/signup/resend-otp?${params.toString()}`,
+        { method: 'POST' }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        return {
+          error: getErrorMessage(data, 'Unable to resend the verification code.'),
+        };
+      }
+
+      return { success: true };
+    } catch {
+      return {
+        error: 'Cannot connect to the server. Please try again.',
       };
     }
   };
@@ -98,14 +157,10 @@ export function AuthProvider({ children }) {
 
       if (!response.ok) {
         return {
-          error: getErrorMessage(
-            data,
-            'Email or password is incorrect.'
-          ),
+          error: getErrorMessage(data, 'Email or password is incorrect.'),
         };
       }
 
-      // Do not save the user before OTP verification.
       if (data.message === 'otp_required') {
         return { otpRequired: true, email };
       }
@@ -122,11 +177,14 @@ export function AuthProvider({ children }) {
 
   const verifyLoginOtp = async (email, otp) => {
     try {
-      const params = new URLSearchParams({ email, otp });
+      const params = new URLSearchParams({
+        email: email.trim().toLowerCase(),
+        otp,
+      });
 
       const response = await fetch(
         `${API_URL}/login/verify-otp?${params.toString()}`,
-        { method: 'POST', credentials: 'include' }
+        { method: 'POST' }
       );
 
       const data = await response.json().catch(() => ({}));
@@ -152,7 +210,9 @@ export function AuthProvider({ children }) {
 
   const resendLoginOtp = async (email) => {
     try {
-      const params = new URLSearchParams({ email });
+      const params = new URLSearchParams({
+        email: email.trim().toLowerCase(),
+      });
 
       const response = await fetch(
         `${API_URL}/login/resend-otp?${params.toString()}`,
@@ -174,111 +234,91 @@ export function AuthProvider({ children }) {
       };
     }
   };
-  
-const forgotPassword = async (email) => {
-  try {
-    const params = new URLSearchParams({ email });
 
-    const response = await fetch(
-      `${API_URL}/forgot-password?${params.toString()}`,
-      { method: 'POST' }
-    );
+  const forgotPassword = async (email) => {
+    try {
+      const params = new URLSearchParams({
+        email: email.trim().toLowerCase(),
+      });
 
-    const data = await response.json().catch(() => ({}));
+      const response = await fetch(
+        `${API_URL}/forgot-password?${params.toString()}`,
+        { method: 'POST' }
+      );
 
-    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        return {
+          error: getErrorMessage(data, 'Unable to send the reset code. Please try again.'),
+        };
+      }
+
+      return { success: true };
+    } catch {
       return {
-        error: getErrorMessage(
-          data,
-          'Unable to send the reset code. Please try again.'
-        ),
+        error: 'Cannot connect to the server. Make sure the backend is running.',
       };
     }
+  };
 
-    return { success: true };
-  } catch {
-    return {
-      error: 'Cannot connect to the server. Make sure the backend is running.',
-    };
-  }
-};
+  const verifyResetOtp = async (email, otp) => {
+    try {
+      const params = new URLSearchParams({
+        email: email.trim().toLowerCase(),
+        otp,
+      });
 
+      const response = await fetch(
+        `${API_URL}/verify-otp?${params.toString()}`,
+        { method: 'POST' }
+      );
 
-const verifyResetOtp = async (email, otp) => {
-  try {
-    const params = new URLSearchParams({ email, otp });
+      const data = await response.json().catch(() => ({}));
 
-    const response = await fetch(
-      `${API_URL}/verify-otp?${params.toString()}`,
-      { method: 'POST' }
-    );
+      if (!response.ok) {
+        return {
+          error: getErrorMessage(data, 'Invalid or expired reset code.'),
+        };
+      }
 
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      return {
-        error: getErrorMessage(
-          data,
-          'Invalid or expired reset code.'
-        ),
-      };
+      return { success: true };
+    } catch {
+      return { error: 'Cannot connect to the server. Please try again.' };
     }
+  };
 
-    return { success: true };
-  } catch {
-    return {
-      error: 'Cannot connect to the server. Please try again.',
-    };
-  }
-};
+  const resendResetOtp = async (email) => forgotPassword(email);
 
-const resendResetOtp = async (email) => {
-  // Request a fresh reset code using the existing endpoint.
-  return await forgotPassword(email);
-};
+  const resetPassword = async (email, newPassword) => {
+    try {
+      const params = new URLSearchParams({
+        email: email.trim().toLowerCase(),
+        new_password: newPassword,
+      });
 
-const resetPassword = async (email, newPassword) => {
-  try {
-    const params = new URLSearchParams({
-      email,
-      new_password: newPassword,
-    });
+      const response = await fetch(
+        `${API_URL}/reset-password?${params.toString()}`,
+        { method: 'POST' }
+      );
 
-    const response = await fetch(
-      `${API_URL}/reset-password?${params.toString()}`,
-      { method: 'POST' }
-    );
+      const data = await response.json().catch(() => ({}));
 
-    const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return {
+          error: getErrorMessage(data, 'Unable to reset password. Please try again.'),
+        };
+      }
 
-    if (!response.ok) {
-      return {
-        error: getErrorMessage(
-          data,
-          'Unable to reset password. Please try again.'
-        ),
-      };
+      return { success: true };
+    } catch {
+      return { error: 'Cannot connect to the server. Please try again.' };
     }
-
-    return { success: true };
-  } catch {
-    return {
-      error: 'Cannot connect to the server. Please try again.',
-    };
-  }
-};
-
+  };
 
   const logout = async () => {
-    try {
-      await fetch(`${API_URL}/logout`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-    } finally {
-      store.set('session', null);
-      setUser(null);
-    }
+    store.set('session', null);
+    setUser(null);
   };
 
   return (
@@ -286,13 +326,15 @@ const resetPassword = async (email, newPassword) => {
       value={{
         user,
         signup,
+        verifySignupOtp,
+        resendSignupOtp,
         login,
         verifyLoginOtp,
         resendLoginOtp,
         forgotPassword,
         verifyResetOtp,
         resendResetOtp,
-         resetPassword,
+        resetPassword,
         logout,
       }}
     >

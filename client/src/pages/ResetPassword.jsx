@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Form, Button } from 'react-bootstrap';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
@@ -5,6 +6,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotice } from '../context/NoticeContext.jsx';
+import { confetti } from '../utils/confetti.js';
 
 export default function ResetPassword() {
   const { resetPassword } = useAuth();
@@ -46,6 +48,9 @@ export default function ResetPassword() {
         setError(result.error);
         return;
       }
+
+      // Run existing confetti after successful password update.
+      confetti();
 
       showNotice({
         title: 'Password changed successfully',

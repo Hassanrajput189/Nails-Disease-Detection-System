@@ -35,14 +35,6 @@ class PredictionResponse(BaseModel):
 
 
 
-class PatientInfo(BaseModel):
-    fullName: str
-    age: int
-    gender: str
-    patiendEmail: EmailStr
-    
-    contactNumber: Optional[str] = None    
-    clinicalNotes: Optional[str] = None
 
 
 class ImageInfo(BaseModel):
@@ -57,8 +49,6 @@ class AnalysisResult(BaseModel):
 
 class Analysis(BaseModel):
     userEmail: EmailStr
-    
-    patient: PatientInfo
 
     image: ImageInfo
 

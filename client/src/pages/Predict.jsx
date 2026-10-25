@@ -3,8 +3,12 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Alert } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
-import { store } from '../utils/storage.js';
-import { predict, readFile, makeThumb, isHealthy } from '../utils/predict.js';
+import {
+  predict,
+  readFile,
+  makeThumb,
+  isHealthy,
+} from '../utils/predict.js';
 import { confetti } from '../utils/confetti.js';
 import ResultModal from '../components/ResultModal.jsx';
 
@@ -25,7 +29,7 @@ export default function Predict() {
   const [error, setError] = useState('');
 
   const run = async (file) => {
-    if (!file) return;
+    if (!file || busy) return;
 
     if (!file.type.startsWith('image/')) {
       setError('Please choose a valid image file.');
@@ -48,19 +52,22 @@ export default function Predict() {
       const progress = setInterval(() => {
         setBusy((current) =>
           current
-            ? { ...current, step: Math.min(current.step + 1, 2) }
+            ? {
+                ...current,
+                step: Math.min(current.step + 1, 2),
+              }
             : null
         );
       }, 900);
 
       try {
         const [prediction] = await Promise.all([
-          predict(file),
+          predict(file, user.email),
           new Promise((resolve) => setTimeout(resolve, 1200)),
         ]);
 
         const record = {
-          id: Date.now(),
+          id: prediction.id || Date.now(),
           name: file.name,
           th,
           img: src,
@@ -72,15 +79,12 @@ export default function Predict() {
           at: new Date().toISOString(),
         };
 
-        const key = `hist:${user.email}`;
-        const history = store.get(key, []);
-
-        store.set(key, [record, ...history].slice(0, 50));
-
         setResult(record);
 
-        // Celebrate only when the nail is healthy; stay calm for any disease / bite result.
-        if (isHealthy(prediction.predicted_category)) confetti();
+        // Celebrate only when the completed prediction is healthy.
+        if (isHealthy(prediction.predicted_category)) {
+          confetti();
+        }
       } finally {
         clearInterval(progress);
         setBusy(null);
@@ -106,7 +110,11 @@ export default function Predict() {
       </p>
 
       {error && (
-        <Alert variant="danger" dismissible onClose={() => setError('')}>
+        <Alert
+          variant="danger"
+          dismissible
+          onClose={() => setError('')}
+        >
           {error}
         </Alert>
       )}

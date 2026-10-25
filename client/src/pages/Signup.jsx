@@ -1,15 +1,13 @@
+
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Form, Button } from 'react-bootstrap';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import AuthLayout from '../components/AuthLayout.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { useNotice } from '../context/NoticeContext.jsx';
-import { confetti } from '../utils/confetti.js';
 
 export default function Signup() {
   const { signup } = useAuth();
-  const { showNotice } = useNotice();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -17,15 +15,13 @@ export default function Signup() {
     email: '',
     password: '',
   });
-
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [shake, setShake] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const set = (key) => (e) => {
+  const set = (key) => (e) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
-  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -40,19 +36,21 @@ export default function Signup() {
         form.password
       );
 
-      if (res.error) {
+      if (res?.error) {
         setError(res.error);
         requestAnimationFrame(() => setShake(true));
-      } else {
-        confetti();
-
-        showNotice({
-          title: 'Account created successfully',
-          text: 'Your account is ready. Please log in to continue.',
-          button: 'Go to login',
+      } else if (res?.otpRequired && res?.email) {
+        // Account creation is completed only after OTP verification.
+        // Do not trigger confetti at this stage.
+        navigate('/verify-signup-otp', {
+          replace: true,
+          state: { email: res.email },
         });
-
-        navigate('/login', { replace: true });
+      } else {
+        setError(
+          'Could not start email verification. Please try again.'
+        );
+        requestAnimationFrame(() => setShake(true));
       }
     } catch {
       setError('Something went wrong. Please try again.');
@@ -66,10 +64,15 @@ export default function Signup() {
     <AuthLayout>
       <div className="seg">
         <Link to="/login">Log in</Link>
-        <Link to="/signup" className="on">Sign up</Link>
+        <Link to="/signup" className="on">
+          Sign up
+        </Link>
       </div>
 
-      <Form onSubmit={submit} className={shake ? 'shake' : ''}>
+      <Form
+        onSubmit={submit}
+        className={shake ? 'shake' : ''}
+      >
         <Form.Floating className="mb-3">
           <Form.Control
             id="sn"
@@ -108,13 +111,14 @@ export default function Signup() {
             required
             style={{ paddingRight: '45px' }}
           />
-
           <label htmlFor="sp">Password (8+ characters)</label>
 
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            aria-label={
+              showPassword ? 'Hide password' : 'Show password'
+            }
             aria-pressed={showPassword}
             title={showPassword ? 'Hide password' : 'Show password'}
             className="border-0 bg-transparent position-absolute"
@@ -132,14 +136,20 @@ export default function Signup() {
           </button>
         </Form.Floating>
 
-        <div className="err" role="alert">{error}</div>
+        {error && (
+          <div className="err mb-2" role="alert">
+            {error}
+          </div>
+        )}
 
         <Button
           type="submit"
           className="btn-grad w-100"
           disabled={loading}
         >
-          {loading ? 'Creating account...' : 'Create account'}
+          {loading
+            ? 'Sending verification code...'
+            : 'Create account'}
         </Button>
       </Form>
     </AuthLayout>

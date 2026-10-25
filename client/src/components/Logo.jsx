@@ -1,4 +1,4 @@
-/* Nail Bite Detector logo: a nail with a bite mark + scan line. Colors follow the active theme. */
+/* Nail Disease Detector logo: a nail with a bite mark + scan line. Colors follow the active theme. */
 export default function Logo({ size = 38 }) {
   return (
     <svg
@@ -6,7 +6,7 @@ export default function Logo({ size = 38 }) {
       width={size}
       height={size}
       role="img"
-      aria-label="Nail Bite Detector logo"
+      aria-label="Nail Disease Detector logo"
       className="logo-mark"
     >
       <defs>

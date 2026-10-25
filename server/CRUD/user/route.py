@@ -1,6 +1,6 @@
 
 from fastapi import APIRouter, HTTPException
-from pydantic import EmailStr
+from pydantic import EmailStr, BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
@@ -11,6 +11,7 @@ from decouple import config
 from argon2 import PasswordHasher
 
 import smtplib
+import time
 from email.message import EmailMessage
 
 from CRUD.user.otp_utils import (
@@ -24,29 +25,46 @@ from CRUD.user.otp_utils import (
 
 router = APIRouter()
 
+
+class SignupOTPVerification(BaseModel):
+    email: EmailStr
+    otp: str
+
+
+# Pending signup details are kept temporarily and are NOT inserted into MongoDB
+# until the user successfully verifies the signup OTP.
+pending_signup_store = {}
+SIGNUP_EXPIRY_SECONDS = 300
+
 collection_name = config("USER_COLLECTION_NAME")
 smtp_email = config("SMTP_EMAIL")
 smtp_password = config("SMTP_PASSWORD")
-
 
 collection = create_collection(db, collection_name)
 ph = PasswordHasher()
 
 
-
 # SEND OTP EMAIL
-
 
 def send_otp_email(receiver_email, otp, purpose="reset"):
     msg = EmailMessage()
 
-    if purpose == "login":
+    if purpose == "signup":
+        subject = "Your Signup Verification Code - NailCare AI"
+        heading = "Verify Your Signup"
+        description = (
+            "Enter this verification code to complete "
+            "your NailCare AI account registration."
+        )
+
+    elif purpose == "login":
         subject = "Your Login Verification Code - NailCare AI"
         heading = "Verify Your Login"
         description = (
             "Enter this verification code to complete "
             "your NailCare AI login."
         )
+
     else:
         subject = "Password Reset Code - NailCare AI"
         heading = "Reset Your Password"
@@ -127,9 +145,7 @@ def send_otp_email(receiver_email, otp, purpose="reset"):
         smtp.send_message(msg)
 
 
-
 # LOGIN - PASSWORD CHECK, THEN SEND OTP
-
 
 @router.post("/login")
 def login(user: UserLogin):
@@ -151,6 +167,12 @@ def login(user: UserLogin):
             detail="Email or password is incorrect.",
         )
 
+    if existing_user.get("is_verified", True) is False:
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your email before logging in.",
+        )
+
     otp = generate_otp()
     save_otp(f"login:{email}", otp)
 
@@ -165,9 +187,7 @@ def login(user: UserLogin):
     return {"message": "otp_required"}
 
 
-
 # VERIFY LOGIN OTP - COMPLETE LOGIN
-
 
 @router.post("/login/verify-otp")
 def verify_login_otp(email: EmailStr, otp: str):
@@ -189,7 +209,7 @@ def verify_login_otp(email: EmailStr, otp: str):
 
     existing_user["_id"] = str(existing_user["_id"])
 
-    response = JSONResponse(
+    return JSONResponse(
         status_code=200,
         content={
             "message": "login successful",
@@ -197,21 +217,8 @@ def verify_login_otp(email: EmailStr, otp: str):
         },
     )
 
-    response.set_cookie(
-        key="user_email",
-        value=email,
-        max_age=86400,
-        httponly=True,
-        secure=False,
-        samesite="lax",
-    )
-
-    return response
-
-
 
 # RESEND LOGIN OTP
-
 
 @router.post("/login/resend-otp")
 def resend_login_otp(email: EmailStr):
@@ -239,30 +246,17 @@ def resend_login_otp(email: EmailStr):
     return {"message": "OTP sent successfully"}
 
 
-
-# LOGOUT
-
+# LOGOUT - NO SESSION COOKIE
 
 @router.get("/logout")
 def logout():
-    response = JSONResponse(
+    return JSONResponse(
         status_code=200,
         content={"message": "Logged out successfully"},
     )
 
-    response.delete_cookie(
-        key="user_email",
-        httponly=True,
-        secure=False,
-        samesite="lax",
-    )
-
-    return response
-
-
 
 # SIGNUP
-
 
 @router.post("/signup")
 def create_user(user: User):
@@ -280,7 +274,67 @@ def create_user(user: User):
     user_data["email"] = email
     user_data["password"] = ph.hash(user.password)
 
+    otp = generate_otp()
+    save_otp(f"signup:{email}", otp)
+
+    pending_signup_store[email] = {
+        "user_data": user_data,
+        "expires_at": time.time() + SIGNUP_EXPIRY_SECONDS,
+    }
+
+    try:
+        send_otp_email(email, otp, purpose="signup")
+    except Exception:
+        pending_signup_store.pop(email, None)
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to send verification email. Please try again.",
+        )
+
+    return JSONResponse(
+        status_code=200,
+        content={"message": "otp_required"},
+    )
+
+
+@router.post("/signup/verify-otp")
+def verify_signup_otp(payload: SignupOTPVerification):
+    email = str(payload.email).strip().lower()
+    otp = str(payload.otp).strip()
+
+    pending = pending_signup_store.get(email)
+
+    if not pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Signup session not found. Please sign up again.",
+        )
+
+    if time.time() >= pending["expires_at"]:
+        pending_signup_store.pop(email, None)
+        raise HTTPException(
+            status_code=400,
+            detail="Signup session expired. Please sign up again.",
+        )
+
+    if not verify_otp(f"signup:{email}", otp):
+        raise HTTPException(
+            status_code=400,
+            detail="OTP is invalid or expired. Please request a new code.",
+        )
+
+    if collection.find_one({"email": email}):
+        pending_signup_store.pop(email, None)
+        raise HTTPException(
+            status_code=400,
+            detail="User already exists.",
+        )
+
+    user_data = pending["user_data"]
+    user_data["is_verified"] = True
+
     collection.insert_one(user_data)
+    pending_signup_store.pop(email, None)
 
     return JSONResponse(
         status_code=201,
@@ -288,9 +342,49 @@ def create_user(user: User):
     )
 
 
+@router.post("/signup/resend-otp")
+def resend_signup_otp(email: EmailStr):
+    email = str(email).strip().lower()
+    pending = pending_signup_store.get(email)
+
+    if not pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Signup session not found or expired. Please sign up again.",
+        )
+
+    if time.time() >= pending["expires_at"]:
+        pending_signup_store.pop(email, None)
+        raise HTTPException(
+            status_code=400,
+            detail="Signup session expired. Please sign up again.",
+        )
+
+    if collection.find_one({"email": email}):
+        pending_signup_store.pop(email, None)
+        raise HTTPException(
+            status_code=400,
+            detail="User already exists.",
+        )
+
+    otp = generate_otp()
+    save_otp(f"signup:{email}", otp)
+
+    try:
+        send_otp_email(email, otp, purpose="signup")
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to send verification email. Please try again.",
+        )
+
+    return JSONResponse(
+        status_code=200,
+        content={"message": "OTP sent successfully"},
+    )
+
 
 # UPDATE USER
-
 
 @router.patch("/update")
 def update_user(email: EmailStr, user: UserUpdate):
@@ -329,9 +423,7 @@ def update_user(email: EmailStr, user: UserUpdate):
     )
 
 
-
 # DELETE USER
-
 
 @router.delete("/delete/{email}")
 def delete_user(email: str):
@@ -353,9 +445,7 @@ def delete_user(email: str):
     )
 
 
-
 # FORGOT PASSWORD - SEND RESET OTP
-
 
 @router.post("/forgot-password")
 def forgot_password(email: EmailStr):
@@ -386,9 +476,7 @@ def forgot_password(email: EmailStr):
     )
 
 
-
 # VERIFY PASSWORD RESET OTP
-
 
 @router.post("/verify-otp")
 def verify_reset_otp(email: EmailStr, otp: str):
@@ -406,7 +494,6 @@ def verify_reset_otp(email: EmailStr, otp: str):
         status_code=200,
         content={"message": "OTP verified successfully"},
     )
-
 
 
 # RESET PASSWORD
