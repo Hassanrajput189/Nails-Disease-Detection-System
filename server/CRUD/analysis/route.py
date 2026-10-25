@@ -79,7 +79,7 @@ def delete_analysis(public_id: str, user_email: str):
             detail="Internal Server Error | Please try again later",
         )
 
-@router.delete("/delete_all_analysis/{user_email}")
+@router.delete("/delete_all_analyses/{user_email}")
 def delete_all_analysis(user_email: str):
 
     try:

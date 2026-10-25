@@ -15,7 +15,6 @@ import requests
 HF_REPO = config("HF_REPO")
 HF_TOKEN = config("HF_TOKEN")
 gatekeeper_model_path = config("GATEKEEPER_MODEL_PATH")
-detector_path = config("DETECTOR_PATH")
 classifier_path = config("CLASSIFIER_PATH")
 
 
@@ -76,19 +75,6 @@ def download_and_load_classifier():
     print("Downloaded & loaded model to path:", model_path)    
     
 
-
-def download_and_load_detector():
-    global model_YOLO
-
-    YOLO_path = hf_hub_download(
-        repo_id=HF_REPO,
-        filename=detector_path,
-        token=HF_TOKEN
-    )
-
-    model_YOLO = YOLO(YOLO_path)
-
-    print("Downloaded & loaded YOLO model to path:", YOLO_path)
 
 
 def gatekeeper_inference(image):

@@ -38,3 +38,5 @@ auth_test.html
 # node modules 
 node_modules/
 
+# images 
+images/

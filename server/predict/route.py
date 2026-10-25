@@ -1,9 +1,6 @@
-
-import base64
 import time
 import cv2
 import numpy as np
-from bson import ObjectId
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from CRUD.analysis.route import  create_analysis
@@ -31,49 +28,6 @@ CLASS_LABELS = [
     "psoriasis",
 ]
 
-
-def make_original_preview(image_bytes: bytes) -> str:
-    """
-    Create a compact JPEG preview of the uploaded image.
-    The preview preserves the original image's colours.
-    """
-    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
-    original = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-
-    if original is None:
-        raise HTTPException(
-            status_code=422,
-            detail="Unprocessable Image",
-        )
-
-    height, width = original.shape[:2]
-    max_dimension = 512
-
-    if max(height, width) > max_dimension:
-        scale = max_dimension / max(height, width)
-        new_width = max(1, int(width * scale))
-        new_height = max(1, int(height * scale))
-
-        original = cv2.resize(
-            original,
-            (new_width, new_height),
-            interpolation=cv2.INTER_AREA,
-        )
-
-    success, encoded = cv2.imencode(
-        ".jpg",
-        original,
-        [cv2.IMWRITE_JPEG_QUALITY, 80],
-    )
-
-    if not success:
-        raise HTTPException(
-            status_code=500,
-            detail="Unable to save the uploaded image preview.",
-        )
-
-    encoded_string = base64.b64encode(encoded.tobytes()).decode("utf-8")
-    return f"data:image/jpeg;base64,{encoded_string}"
 
 
 @router.post("/predict", response_model=PredictionResponse)
@@ -277,80 +231,3 @@ async def predict_grade(
         detail=str(e)
 )
 
-
-@router.get("/history")
-def get_prediction_history(user_email: str):
-    user_email = user_email.strip().lower()
-
-    if not user_email:
-        raise HTTPException(
-            status_code=400,
-            detail="User email is required.",
-        )
-
-    try:
-        records = list(
-            prediction_collection.find(
-                {"user_email": user_email},
-                {"heatmap": 0},
-            ).sort("created_at", -1)
-        )
-
-        for record in records:
-            record["id"] = str(record.pop("_id"))
-            record["at"] = record.get("created_at")
-
-        return {"predictions": records}
-
-    except Exception as exc:
-        print("History error:", str(exc))
-        raise HTTPException(
-            status_code=500,
-            detail="Unable to load prediction history.",
-        )
-
-
-@router.delete("/history/{prediction_id}")
-def delete_prediction(prediction_id: str, user_email: str):
-    user_email = user_email.strip().lower()
-
-    if not user_email:
-        raise HTTPException(
-            status_code=400,
-            detail="User email is required.",
-        )
-
-    if not ObjectId.is_valid(prediction_id):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid prediction ID.",
-        )
-
-    try:
-        result = prediction_collection.delete_one(
-            {
-                "_id": ObjectId(prediction_id),
-                "user_email": user_email,
-            }
-        )
-
-        if result.deleted_count == 0:
-            raise HTTPException(
-                status_code=404,
-                detail="Result not found for this user.",
-            )
-
-        return {
-            "success": True,
-            "message": "Prediction deleted successfully.",
-            "id": prediction_id,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        print("Delete prediction error:", str(exc))
-        raise HTTPException(
-            status_code=500,
-            detail="Unable to delete prediction.",
-        )
