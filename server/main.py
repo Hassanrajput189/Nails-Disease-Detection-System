@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from predict.route import router as prediction_router
 from CRUD.user.route import router as user_router
 from CRUD.analysis.route import router as analysis_router
-from utils import  download_and_load_classifier,download_and_load_detector,download_and_load_gatekeeper
+from utils import  download_and_load_classifier,download_and_load_gatekeeper
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from decouple import config
@@ -22,7 +22,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 download_and_load_gatekeeper()
-download_and_load_detector()
 download_and_load_classifier()
 
 app.include_router(user_router)
